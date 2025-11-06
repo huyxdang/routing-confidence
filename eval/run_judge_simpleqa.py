@@ -170,7 +170,7 @@ def load_dataset_from_hf(dataset_path):
         List of question dictionaries with 'original_index', 'question', 'answer' fields
     """
     print(f"Loading dataset from HuggingFace: {dataset_path}")
-    dataset = load_dataset(dataset_path, split="test").to_dict()
+    dataset = load_dataset(dataset_path, split="eval").to_dict()
     # convert to list of json for async parallelism
     questions = [dict(zip(dataset.keys(), values)) for values in zip(*dataset.values())]
     return questions
