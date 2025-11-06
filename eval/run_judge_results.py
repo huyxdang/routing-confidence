@@ -67,20 +67,21 @@ async def extract_answer(question, correct_answer, response):
         return None
         
 async def add_judge_response(question, predictions):
-    unique_id = question["id"]
-    prediction = copy.deepcopy(predictions[unique_id]) # not in-place
+    # Use original_index as the key for matching
+    original_index = question["original_index"]
+    prediction = copy.deepcopy(predictions[original_index]) # not in-place
     question_text = question["question"]
     correct_answer = question["answer"]
 
     if "judge_response" in prediction: # already judged
-        return unique_id, prediction
+        return original_index, prediction
     
     response = prediction["response"]
     content = await extract_answer(question_text, correct_answer, response)
 
     if content is not None:
         prediction["judge_response"] = content # local in-place
-        return unique_id, prediction
+        return original_index, prediction
     else:
         return None, None
 
@@ -180,10 +181,10 @@ def load_dataset_local(dataset_path):
             if not questions:
                 raise ValueError("Local dataset file is empty")
             # Validate required fields
-            if all(key in questions[0] for key in ['id', 'question', 'answer']):
+            if all(key in questions[0] for key in ['original_index', 'question', 'answer']):
                 return questions
             else:
-                raise ValueError("Local dataset must contain objects with 'id', 'question', and 'answer' fields")
+                raise ValueError("Local dataset must contain objects with 'original_index', 'question', and 'answer' fields")
         else:
             raise ValueError(f"Local dataset file must contain a JSON array, got {type(questions)}")
     else:
@@ -213,14 +214,15 @@ def main(args):
     else:
         judged_predictions = {}
     
-    questions = [q for q in questions if q["id"] in predictions and q["id"] not in judged_predictions]
+    # Match by original_index
+    questions = [q for q in questions if q["original_index"] in predictions and q["original_index"] not in judged_predictions]
 
      # API will only be called for unjudged responses
     results = asyncio.run(judge_all_responses(questions, predictions))
     
-    for unique_id, predictions in results:
-        if unique_id is not None:
-            judged_predictions[unique_id] = predictions
+    for original_index, prediction in results:
+        if original_index is not None:
+            judged_predictions[original_index] = prediction
 
     # cache judge output
     with open(output_filepath, "w") as f:
