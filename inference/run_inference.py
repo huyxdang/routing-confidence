@@ -5,8 +5,9 @@ Confidence scores prompted in [0,1] range
 """
 import json
 import argparse
-from vllm import LLM, SamplingParams
 import os
+from vllm import LLM, SamplingParams
+from datasets import load_dataset
 
 # Confidence prompting template - IMPORTANT: Confidence must be in [0, 1] range
 CONFIDENCE_PROMPT = """Answer the following question and provide your confidence level.
@@ -27,16 +28,68 @@ Example:
 Answer: Paris
 Confidence: 0.95"""
 
+def load_questions(questions_path):
+    """
+    Load questions from local JSON file or HuggingFace dataset.
+    
+    Args:
+        questions_path: Path to local JSON file or HuggingFace dataset name
+        
+    Returns:
+        List of question dictionaries with 'original_index' and 'question' fields
+    """
+    # Check if it's a local file
+    if os.path.isfile(questions_path) or (questions_path.endswith('.json') and '/' in questions_path):
+        # Load from local JSON file
+        print(f"Loading questions from local file: {questions_path}")
+        with open(questions_path, "r") as f:
+            questions = json.load(f)
+        
+        if not isinstance(questions, list):
+            raise ValueError(f"Local questions file must contain a JSON array, got {type(questions)}")
+        
+        # Validate required fields
+        if questions and not all(key in questions[0] for key in ['original_index', 'question']):
+            raise ValueError("Questions must contain 'original_index' and 'question' fields")
+        
+        return questions
+    else:
+        # Load from HuggingFace
+        print(f"Loading questions from HuggingFace: {questions_path}")
+        dataset = load_dataset(questions_path, split="eval").to_dict()
+        # Convert to list of dictionaries
+        questions = [dict(zip(dataset.keys(), values)) for values in zip(*dataset.values())]
+        
+        # Ensure we have the required fields
+        if questions:
+            # Handle field name differences (SimpleQA-verified uses 'problem' not 'question')
+            if 'question' not in questions[0] and 'problem' in questions[0]:
+                for q in questions:
+                    q['question'] = q['problem']
+            
+            # Ensure original_index exists
+            if 'original_index' not in questions[0]:
+                # If using original SimpleQA-verified, it should have original_index
+                # If not, we might need to use the index
+                if 'original_index' not in dataset:
+                    print("Warning: Dataset doesn't have 'original_index', using array index")
+                    for i, q in enumerate(questions):
+                        q['original_index'] = i
+        
+        return questions
+
 def run_inference(model_name, questions_file, output_file, tensor_parallel_size=1, max_tokens=128, batch_size=50):
     """Run inference on all questions using vLLM with partial progress saving"""
     
     # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    # Load questions
-    with open(questions_file, "r") as f:
-        questions = json.load(f)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     
-    print(f"Loaded {len(questions)} questions from {questions_file}")
+    # Load questions (local JSON or HuggingFace)
+    questions = load_questions(questions_file)
+    
+    print(f"Loaded {len(questions)} questions")
     print(f"Loading model: {model_name}")
     
     # Initialize vLLM
@@ -108,7 +161,7 @@ if __name__ == "__main__":
         "--questions",
         type=str,
         default="data/simpleqa_300.json",
-        help="Path to questions file"
+        help="Path to local JSON file or HuggingFace dataset name (e.g., google/simpleqa-verified)"
     )
     parser.add_argument(
         "--output",
