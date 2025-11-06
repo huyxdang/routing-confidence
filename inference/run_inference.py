@@ -29,10 +29,9 @@ Confidence: 0.95"""
 
 def run_inference(model_name, questions_file, output_file, tensor_parallel_size=1, max_tokens=128, batch_size=50):
     """Run inference on all questions using vLLM with partial progress saving"""
-
+    
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    
     # Load questions
     with open(questions_file, "r") as f:
         questions = json.load(f)
@@ -78,7 +77,9 @@ def run_inference(model_name, questions_file, output_file, tensor_parallel_size=
         # Add to predictions
         for i, output in enumerate(batch_outputs):
             question_idx = batch_start + i
-            predictions[questions[question_idx]["id"]] = {
+            # Use original_index as the key for matching
+            original_index = questions[question_idx]["original_index"]
+            predictions[original_index] = {
                 "response": output.outputs[0].text.strip()
             }
         
