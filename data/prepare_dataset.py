@@ -1,24 +1,36 @@
 # data/prepare_dataset.py
 """
-Download and prepare SimpleQA-verified dataset (300 questions subset)
+Download and prepare SimpleQA-verified dataset (subset of questions)
 """
 import json
 import random
+import argparse
+import os
 from datasets import load_dataset
 
-def prepare_simpleqa_subset(num_questions=300, seed=42):
+def prepare_simpleqa_subset(num_questions=300, seed=42, output_file=None):
     """
     Download SimpleQA-verified and extract a subset of questions
+    
+    Args:
+        num_questions: Number of questions to sample
+        seed: Random seed for reproducibility
+        output_file: Output file path (if None, auto-generates based on num_questions)
     """
     print(f"Loading SimpleQA-verified dataset...")
     dataset = load_dataset("google/simpleqa-verified", split="eval")
     
     print(f"Total questions in dataset: {len(dataset)}")
     
+    # Validate number of questions
+    if num_questions > len(dataset):
+        print(f"Warning: Requested {num_questions} questions but dataset only has {len(dataset)}. Using all {len(dataset)} questions.")
+        num_questions = len(dataset)
+    
     # Set seed for reproducibility
     random.seed(seed)
     
-    # Sample 300 questions
+    # Sample questions
     indices = random.sample(range(len(dataset)), num_questions)
     indices.sort()  # Keep in order for consistency
     
@@ -39,8 +51,16 @@ def prepare_simpleqa_subset(num_questions=300, seed=42):
             "urls": item["urls"]
         })
     
+    # Determine output file
+    if output_file is None:
+        output_file = f"data/simpleqa_{num_questions}.json"
+    
+    # Create directory if needed
+    output_dir = os.path.dirname(output_file)
+    if output_dir:  # Only create directory if there's a path component
+        os.makedirs(output_dir, exist_ok=True)
+    
     # Save to file
-    output_file = "data/simpleqa_300.json"
     with open(output_file, "w") as f:
         json.dump(questions, f, indent=2)
     
@@ -66,5 +86,32 @@ def prepare_simpleqa_subset(num_questions=300, seed=42):
     print(f"Requires reasoning: {sum(1 for q in questions if q['requires_reasoning'])}")
 
 if __name__ == "__main__":
-    prepare_simpleqa_subset()
+    parser = argparse.ArgumentParser(description="Download and prepare SimpleQA-verified dataset subset")
+    parser.add_argument(
+        "--num_questions",
+        type=int,
+        default=300,
+        help="Number of questions to sample from the dataset (default: 300)"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42)"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Output file path (default: data/simpleqa_{num_questions}.json)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Prepare dataset
+    prepare_simpleqa_subset(
+        num_questions=args.num_questions,
+        seed=args.seed,
+        output_file=args.output
+    )
 
