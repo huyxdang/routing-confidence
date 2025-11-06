@@ -159,49 +159,29 @@ def dump_metrics(predictions, n):
     print(f"Calibration Error: {calibration_error}")
 
 
-def load_dataset_local(dataset_path):
+def load_dataset_from_hf(dataset_path):
     """
-    Load dataset from local JSON file or HuggingFace dataset.
+    Load dataset from HuggingFace.
     
     Args:
-        dataset_path: Path to local JSON file or HuggingFace dataset name
+        dataset_path: HuggingFace dataset name
         
     Returns:
-        List of question dictionaries with 'id', 'question', 'answer' fields
+        List of question dictionaries with 'original_index', 'question', 'answer' fields
     """
-    # Check if it's a local file (exists and is a file, or ends with .json)
-    if os.path.isfile(dataset_path) or (dataset_path.endswith('.json') and '/' in dataset_path):
-        # Load from local JSON file
-        print(f"Loading dataset from local file: {dataset_path}")
-        with open(dataset_path, "r") as f:
-            questions = json.load(f)
-        
-        # Ensure it's a list
-        if isinstance(questions, list):
-            if not questions:
-                raise ValueError("Local dataset file is empty")
-            # Validate required fields
-            if all(key in questions[0] for key in ['original_index', 'question', 'answer']):
-                return questions
-            else:
-                raise ValueError("Local dataset must contain objects with 'original_index', 'question', and 'answer' fields")
-        else:
-            raise ValueError(f"Local dataset file must contain a JSON array, got {type(questions)}")
-    else:
-        # Load from HuggingFace
-        print(f"Loading dataset from HuggingFace: {dataset_path}")
-        dataset = load_dataset(dataset_path, split="test").to_dict()
-        # convert to list of json for async parallelism
-        questions = [dict(zip(dataset.keys(), values)) for values in zip(*dataset.values())]
-        return questions
+    print(f"Loading dataset from HuggingFace: {dataset_path}")
+    dataset = load_dataset(dataset_path, split="test").to_dict()
+    # convert to list of json for async parallelism
+    questions = [dict(zip(dataset.keys(), values)) for values in zip(*dataset.values())]
+    return questions
 
 def main(args):
     assert args.num_workers > 1, "num_workers must be 2 or greater"
 
     output_filepath = f"judged_{os.path.basename(args.predictions)}.json"   
     
-    # Load dataset (local JSON or HuggingFace)
-    questions = load_dataset_local(args.dataset)
+    # Load dataset from HuggingFace
+    questions = load_dataset_from_hf(args.dataset)
     total_questions = len(questions)
 
     with open(args.predictions, "r") as f:
@@ -235,7 +215,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset", 
         type=str, 
-        help="Dataset path: local JSON file (e.g., data/simpleqa_300.json) or HuggingFace dataset name (e.g., google/simpleqa-verified)"
+        help="HuggingFace dataset name (e.g., google/simpleqa-verified)"
     )
     parser.add_argument("--predictions", type=str, help="Model Predictions")
     parser.add_argument("--num_workers", type=int, default=100, help="Async semaphore size. This depends on your rate limit.")
