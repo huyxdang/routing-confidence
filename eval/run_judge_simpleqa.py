@@ -98,7 +98,7 @@ async def judge_all_responses(questions, predictions):
     return results
 
 # source: https://github.com/hendrycks/outlier-exposure/blob/master/utils/calibration_tools.py
-def calib_err(confidence, correct, p='2', beta=100): 
+def calib_err(confidence, correct, p='2', beta=20): 
     # beta is target bin size
     idxs = np.argsort(confidence)
     confidence = confidence[idxs]
