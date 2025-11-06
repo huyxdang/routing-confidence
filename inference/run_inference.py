@@ -6,6 +6,7 @@ Confidence scores prompted in [0,1] range
 import json
 import argparse
 from vllm import LLM, SamplingParams
+import os
 
 # Confidence prompting template - IMPORTANT: Confidence must be in [0, 1] range
 CONFIDENCE_PROMPT = """Answer the following question and provide your confidence level.
@@ -28,6 +29,10 @@ Confidence: 0.95"""
 
 def run_inference(model_name, questions_file, output_file, tensor_parallel_size=1, max_tokens=128, batch_size=50):
     """Run inference on all questions using vLLM with partial progress saving"""
+
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     # Load questions
     with open(questions_file, "r") as f:
         questions = json.load(f)
@@ -96,7 +101,7 @@ if __name__ == "__main__":
         "--model_name",
         type=str,
         required=True,
-        help="HuggingFace model name (e.g., Qwen/Qwen2.5-7B-Instruct)"
+        help="HuggingFace model name (e.g., Qwen/Qwen2.5-7B)"
     )
     parser.add_argument(
         "--questions",
