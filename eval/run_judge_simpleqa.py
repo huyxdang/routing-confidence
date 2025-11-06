@@ -194,6 +194,37 @@ def main(args):
     else:
         judged_predictions = {}
     
+    # Debug: Check key types and sample values
+    print(f"\nDEBUG: Checking prediction keys...")
+    if predictions:
+        sample_pred_key = list(predictions.keys())[0]
+        print(f"  Sample prediction key: {sample_pred_key} (type: {type(sample_pred_key).__name__})")
+        print(f"  Total predictions: {len(predictions)}")
+        print(f"  Sample prediction keys (first 5): {list(predictions.keys())[:5]}")
+    else:
+        print("  WARNING: Predictions dictionary is empty!")
+    
+    if questions:
+        sample_q = questions[0]
+        sample_orig_idx = sample_q.get("original_index")
+        print(f"\nDEBUG: Checking question original_index...")
+        print(f"  Sample question original_index: {sample_orig_idx} (type: {type(sample_orig_idx).__name__})")
+        print(f"  Total questions: {len(questions)}")
+        print(f"  Sample original_index values (first 5): {[q.get('original_index') for q in questions[:5]]}")
+    
+    # Check how many would match
+    matching_count = sum(1 for q in questions if q["original_index"] in predictions)
+    print(f"\nDEBUG: Matching check:")
+    print(f"  Questions with matching predictions: {matching_count}/{len(questions)}")
+    
+    # Try both string and int matching
+    if matching_count == 0:
+        print("  Trying alternative matching (string/int conversion)...")
+        matching_str = sum(1 for q in questions if str(q["original_index"]) in predictions)
+        matching_int = sum(1 for q in questions if isinstance(q["original_index"], (int, str)) and int(q["original_index"]) in predictions)
+        print(f"  With string keys: {matching_str}")
+        print(f"  With int conversion: {matching_int}")
+    
     # Match by original_index
     questions = [q for q in questions if q["original_index"] in predictions and q["original_index"] not in judged_predictions]
 
