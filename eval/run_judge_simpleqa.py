@@ -1,4 +1,3 @@
-#eval/run_judge_results.py
 """Code taken from https://github.com/hendrycks/outlier-exposure/blob/master/utils/calibration_tools.py"""
 
 import os
@@ -66,10 +65,10 @@ async def extract_answer(question, correct_answer, response):
         print("Error:", e)
         return None
         
-async def add_judge_response(question, predictions):
+async def add_judge_response(question, predictions_int_keys):
     # Use original_index as the key for matching
     original_index = question["original_index"]
-    prediction = copy.deepcopy(predictions[original_index]) # not in-place
+    prediction = copy.deepcopy(predictions_int_keys[original_index]) # not in-place
     question_text = question["question"]
     correct_answer = question["answer"]
 
@@ -85,10 +84,10 @@ async def add_judge_response(question, predictions):
     else:
         return None, None
 
-async def judge_all_responses(questions, predictions):
+async def judge_all_responses(questions, predictions_int_keys):
     async def bound_func(question):
         async with semaphore:
-            content = await add_judge_response(question, predictions)
+            content = await add_judge_response(question, predictions_int_keys)
             return content
             
     semaphore = asyncio.Semaphore(args.num_workers)
@@ -148,6 +147,10 @@ def dump_metrics(predictions, n):
     if len(correct) != n:
         print(f"Available predictions: {len(correct)} | Total questions: {n}")
 
+    # Handle edge case where there are no predictions
+    if len(correct) == 0:
+        print("ERROR: No predictions to evaluate. Cannot compute metrics.")
+        return
 
     accuracy = round(100 * sum(correct) / n, 2)
     # Wald estimator, 95% confidence interval
@@ -212,24 +215,22 @@ def main(args):
         print(f"  Total questions: {len(questions)}")
         print(f"  Sample original_index values (first 5): {[q.get('original_index') for q in questions[:5]]}")
     
+    # FIX: Convert prediction keys to int for matching since JSON keys are strings
+    predictions_int_keys = {int(k): v for k, v in predictions.items()}
+    judged_predictions_int_keys = {int(k): v for k, v in judged_predictions.items()} if judged_predictions else {}
+    
     # Check how many would match
-    matching_count = sum(1 for q in questions if q["original_index"] in predictions)
+    matching_count = sum(1 for q in questions if q["original_index"] in predictions_int_keys)
     print(f"\nDEBUG: Matching check:")
     print(f"  Questions with matching predictions: {matching_count}/{len(questions)}")
     
-    # Try both string and int matching
-    if matching_count == 0:
-        print("  Trying alternative matching (string/int conversion)...")
-        matching_str = sum(1 for q in questions if str(q["original_index"]) in predictions)
-        matching_int = sum(1 for q in questions if isinstance(q["original_index"], (int, str)) and int(q["original_index"]) in predictions)
-        print(f"  With string keys: {matching_str}")
-        print(f"  With int conversion: {matching_int}")
+    # Match by original_index (now using integer keys)
+    questions = [q for q in questions if q["original_index"] in predictions_int_keys and q["original_index"] not in judged_predictions_int_keys]
     
-    # Match by original_index
-    questions = [q for q in questions if q["original_index"] in predictions and q["original_index"] not in judged_predictions]
+    print(f"\nFiltered questions to judge: {len(questions)}")
 
      # API will only be called for unjudged responses
-    results = asyncio.run(judge_all_responses(questions, predictions))
+    results = asyncio.run(judge_all_responses(questions, predictions_int_keys))
     
     for original_index, prediction in results:
         if original_index is not None:
