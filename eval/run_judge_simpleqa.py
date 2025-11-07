@@ -69,7 +69,7 @@ async def add_judge_response(question, predictions_int_keys):
     # Use original_index as the key for matching
     original_index = question["original_index"]
     prediction = copy.deepcopy(predictions_int_keys[original_index]) # not in-place
-    question_text = question["question"]
+    question_text = question["problem"]
     correct_answer = question["answer"]
 
     if "judge_response" in prediction: # already judged
