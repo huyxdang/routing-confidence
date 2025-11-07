@@ -68,7 +68,7 @@ async def extract_answer(question, correct_answer, response):
 async def add_judge_response(question, predictions_int_keys):
     # Use original_index as the key for matching
     original_index = question["original_index"]
-    prediction = copy.deepcopy(predictions_int_keys[original_index]) # not in-place
+    prediction = copy.deepcopy(predictions_int_keys[original_index])
     question_text = question["problem"]
     correct_answer = question["answer"]
 
@@ -170,7 +170,8 @@ def load_dataset_from_hf(dataset_path):
         dataset_path: HuggingFace dataset name
         
     Returns:
-        List of question dictionaries with 'original_index', 'question', 'answer' fields
+        List of question dictionaries with 'original_index', 'problem', 'answer' fields
+        (SimpleQA-verified uses 'problem' not 'question')
     """
     print(f"Loading dataset from HuggingFace: {dataset_path}")
     dataset = load_dataset(dataset_path, split="eval").to_dict()
