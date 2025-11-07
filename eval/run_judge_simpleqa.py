@@ -80,6 +80,9 @@ async def add_judge_response(question, predictions_int_keys):
 
     if content is not None:
         prediction["judge_response"] = content # local in-place
+        # Debug: Show confidence for first few responses
+        if original_index < 5:  # Show first 5 as sample
+            print(f"  [Sample] Q{original_index}: Confidence={content['confidence']}%, Correct={content['correct']}")
         return original_index, prediction
     else:
         return None, None
@@ -156,10 +159,32 @@ def dump_metrics(predictions, n):
     # Wald estimator, 95% confidence interval
     confidence_half_width = round(1.96 * math.sqrt(accuracy * (100 - accuracy) / n), 2)
     calibration_error = 100 * round(calib_err(confidence, correct, p='2', beta=100), 2)
+    
+    # Confidence statistics
+    confidence_array = np.array(confidence) * 100  # Convert back to 0-100 scale
+    mean_confidence = round(np.mean(confidence_array), 2)
+    median_confidence = round(np.median(confidence_array), 2)
+    min_confidence = round(np.min(confidence_array), 2)
+    max_confidence = round(np.max(confidence_array), 2)
+    
+    # Show sample confidence values
+    print(f"\n*** Confidence Statistics ***")
+    print(f"Sample confidence values (first 10): {[round(c*100, 1) for c in confidence[:10]]}")
+    print(f"Mean confidence: {mean_confidence}%")
+    print(f"Median confidence: {median_confidence}%")
+    print(f"Min confidence: {min_confidence}% | Max confidence: {max_confidence}%")
 
-    print("*** Metrics ***")
+    print("\n*** Metrics ***")
     print(f"Accuracy: {accuracy}% +/- {confidence_half_width}% | n = {n}")
     print(f"Calibration Error: {calibration_error}")
+    
+    # Overconfidence analysis
+    mean_accuracy = round(100 * np.mean(correct), 2)
+    overconfidence = round(mean_confidence - mean_accuracy, 2)
+    print(f"\n*** Calibration Analysis ***")
+    print(f"Mean Confidence: {mean_confidence}%")
+    print(f"Mean Accuracy: {mean_accuracy}%")
+    print(f"Overconfidence: {overconfidence}% ({'OVERCONFIDENT' if overconfidence > 0 else 'UNDERCONFIDENT' if overconfidence < 0 else 'WELL-CALIBRATED'})")
 
 
 def load_dataset_from_hf(dataset_path):
