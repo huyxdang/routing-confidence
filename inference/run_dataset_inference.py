@@ -15,14 +15,14 @@ DATASET_CONFIGS = {
         'hf_path': 'huyxdang/math-split',
         'question_field': 'problem',
         'answer_field': 'solution',
-        'max_tokens': 512,
+        'max_tokens': 1024,
         'domain': 'MATH'
     },
     'medqa': {
         'hf_path': 'huyxdang/medqa-split',
         'question_field': 'question',
         'answer_field': 'answer',
-        'max_tokens': 256,
+        'max_tokens': 512,
         'domain': 'MED',
         'has_options': True,
         'options_field': 'options'
@@ -31,7 +31,7 @@ DATASET_CONFIGS = {
         'hf_path': 'huyxdang/boolq-split',
         'question_field': 'question',
         'answer_field': 'answer',
-        'max_tokens': 128,
+        'max_tokens': 512,
         'domain': 'READ',
         'has_passage': True,
         'passage_field': 'passage'

@@ -40,7 +40,12 @@ def test_dataset(dataset_name):
     print(f"{'-'*60}")
     
     print(f"\nGround truth answer:")
-    print(f"  {first_example[config['answer_field']][:200]}...")
+    answer = first_example[config['answer_field']]
+    # Handle different answer types (string, bool, etc.)
+    if isinstance(answer, str):
+        print(f"  {answer[:200]}{'...' if len(answer) > 200 else ''}")
+    else:
+        print(f"  {answer}")
     
     print(f"\n✓ {dataset_name.upper()} test passed!")
 
