@@ -1,5 +1,7 @@
 # Data
 data/
+inference/predictions/
+eval/judged/
 
 # Python
 __pycache__/
