@@ -36,46 +36,46 @@ if [ ! -d "$PRED_DIR" ]; then
     exit 1
 fi
 
-# Llama3-8B predictions
+# Mistral-7B predictions
 echo "==================================
 "
-echo "Judging Llama3-8B predictions"
+echo "Judging Mistral-7B predictions"
 echo "=================================="
 
-if [ -f "$PRED_DIR/metallama38binstruct_math_train.json" ]; then
+if [ -f "$PRED_DIR/mistral7binstructv03_math_train.json" ]; then
     echo "
-[1/6] Judging Llama3-8B MATH..."
+[1/6] Judging Mistral-7B MATH..."
     python run_judge_datasets.py \
-      --predictions "$PRED_DIR/metallama38binstruct_math_train.json" \
+      --predictions "$PRED_DIR/mistral7binstructv03_math_train.json" \
       --dataset math \
       --judge "$JUDGE_MODEL" \
       --num_workers $NUM_WORKERS
 else
-    echo "⚠ Warning: Llama3-8B MATH predictions not found, skipping..."
+    echo "⚠ Warning: Mistral-7B MATH predictions not found, skipping..."
 fi
 
-if [ -f "$PRED_DIR/metallama38binstruct_medqa_train.json" ]; then
+if [ -f "$PRED_DIR/mistral7binstructv03_medqa_train.json" ]; then
     echo "
-[2/6] Judging Llama3-8B MedQA..."
+[2/6] Judging Mistral-7B MedQA..."
     python run_judge_datasets.py \
-      --predictions "$PRED_DIR/metallama38binstruct_medqa_train.json" \
+      --predictions "$PRED_DIR/mistral7binstructv03_medqa_train.json" \
       --dataset medqa \
       --judge "$JUDGE_MODEL" \
       --num_workers $NUM_WORKERS
 else
-    echo "⚠ Warning: Llama3-8B MedQA predictions not found, skipping..."
+    echo "⚠ Warning: Mistral-7B MedQA predictions not found, skipping..."
 fi
 
-if [ -f "$PRED_DIR/metallama38binstruct_boolq_train.json" ]; then
+if [ -f "$PRED_DIR/mistral7binstructv03_boolq_train.json" ]; then
     echo "
-[3/6] Judging Llama3-8B BoolQ..."
+[3/6] Judging Mistral-7B BoolQ..."
     python run_judge_datasets.py \
-      --predictions "$PRED_DIR/metallama38binstruct_boolq_train.json" \
+      --predictions "$PRED_DIR/mistral7binstructv03_boolq_train.json" \
       --dataset boolq \
       --judge "$JUDGE_MODEL" \
       --num_workers $NUM_WORKERS
 else
-    echo "⚠ Warning: Llama3-8B BoolQ predictions not found, skipping..."
+    echo "⚠ Warning: Mistral-7B BoolQ predictions not found, skipping..."
 fi
 
 # Qwen2.5-7B predictions

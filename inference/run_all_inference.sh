@@ -13,7 +13,7 @@ TENSOR_PARALLEL=1
 BATCH_SIZE=50
 
 # Models
-LLAMA3="meta-llama/Meta-Llama-3-8B-Instruct"
+MISTRAL="mistralai/Mistral-7B-Instruct-v0.3"
 QWEN25="Qwen/Qwen2.5-7B-Instruct"
 
 # Create predictions directory
@@ -22,34 +22,34 @@ mkdir -p predictions
 echo "Starting inference runs..."
 echo ""
 
-# Llama3-8B on all datasets
+# Mistral-7B on all datasets
 echo "==================================
 "
-echo "Llama3-8B-Instruct"
+echo "Mistral-7B-Instruct-v0.3"
 echo "=================================="
 
 echo "
-[1/6] Llama3-8B on MATH..."
+[1/6] Mistral-7B on MATH..."
 python run_dataset_inference.py \
-  --model_name "$LLAMA3" \
+  --model_name "$MISTRAL" \
   --dataset math \
   --split train \
   --tensor_parallel_size $TENSOR_PARALLEL \
   --batch_size $BATCH_SIZE
 
 echo "
-[2/6] Llama3-8B on MedQA..."
+[2/6] Mistral-7B on MedQA..."
 python run_dataset_inference.py \
-  --model_name "$LLAMA3" \
+  --model_name "$MISTRAL" \
   --dataset medqa \
   --split train \
   --tensor_parallel_size $TENSOR_PARALLEL \
   --batch_size $BATCH_SIZE
 
 echo "
-[3/6] Llama3-8B on BoolQ..."
+[3/6] Mistral-7B on BoolQ..."
 python run_dataset_inference.py \
-  --model_name "$LLAMA3" \
+  --model_name "$MISTRAL" \
   --dataset boolq \
   --split train \
   --tensor_parallel_size $TENSOR_PARALLEL \
