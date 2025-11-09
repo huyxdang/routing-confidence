@@ -6,6 +6,7 @@ import json
 import copy
 import argparse
 import asyncio
+import time
 from typing import Literal
 from pydantic import BaseModel
 from openai import AsyncOpenAI
@@ -14,6 +15,9 @@ from datasets import load_dataset
 
 
 client = AsyncOpenAI(timeout=300.0, max_retries=1)
+
+# Global counters for logging
+judge_counter = {"total": 0, "successful": 0, "failed": 0, "rate_limited": 0}
 
 
 # Dataset configurations
@@ -64,7 +68,7 @@ class ExtractedAnswer(BaseModel):
     strict: Literal[True]  # 100% reliability
 
 
-async def extract_answer(question, correct_answer, response, judge_model):
+async def extract_answer(question, correct_answer, response, judge_model, retry_count=0, max_retries=3):
     """Use LLM to judge if the response is correct."""
     prompt = JUDGE_PROMPT.format(
         question=question,
@@ -82,6 +86,7 @@ async def extract_answer(question, correct_answer, response, judge_model):
             response_format=ExtractedAnswer,
         )
         content = response.choices[0].message.parsed
+        judge_counter["successful"] += 1
         return {
             "correct_answer": correct_answer,
             "model_answer": content.extracted_final_answer,
@@ -89,8 +94,33 @@ async def extract_answer(question, correct_answer, response, judge_model):
             "correct": content.correct
         }
     except Exception as e:
-        print(f"Error in judge: {e}")
-        return None
+        error_str = str(e)
+        
+        # Check if it's a rate limit error
+        if "rate_limit" in error_str.lower() or "429" in error_str:
+            judge_counter["rate_limited"] += 1
+            
+            if retry_count < max_retries:
+                # Extract wait time from error message if available
+                wait_time = 2.0  # Default wait time
+                if "try again in" in error_str:
+                    try:
+                        wait_part = error_str.split("try again in")[1].split("s")[0].strip()
+                        wait_time = float(wait_part) + 0.5  # Add buffer
+                    except:
+                        pass
+                
+                print(f"  ⚠ Rate limit hit (attempt {retry_count + 1}/{max_retries}). Waiting {wait_time:.1f}s...")
+                await asyncio.sleep(wait_time)
+                return await extract_answer(question, correct_answer, response, judge_model, retry_count + 1, max_retries)
+            else:
+                print(f"  ✗ Rate limit exceeded after {max_retries} retries")
+                judge_counter["failed"] += 1
+                return None
+        else:
+            print(f"  ✗ Error in judge: {e}")
+            judge_counter["failed"] += 1
+            return None
 
 
 async def judge_prediction(index, prediction, dataset_example, domain, judge_model):
@@ -102,6 +132,8 @@ async def judge_prediction(index, prediction, dataset_example, domain, judge_mod
     question = prediction["question"]
     correct_answer = prediction["correct_answer"]
     response = prediction["response"]
+    
+    judge_counter["total"] += 1
     
     # Get judge result
     judge_result = await extract_answer(question, correct_answer, response, judge_model)
@@ -126,6 +158,13 @@ async def judge_prediction(index, prediction, dataset_example, domain, judge_mod
     prediction["correct"] = is_correct
     prediction["tagged_response"] = tagged_response
     prediction["confidence_token"] = confidence_token
+    
+    # Periodic logging (every 100 judgments)
+    if judge_counter["total"] % 100 == 0:
+        success_rate = (judge_counter["successful"] / judge_counter["total"] * 100) if judge_counter["total"] > 0 else 0
+        print(f"  Progress: {judge_counter['total']} judged | {judge_counter['successful']} successful | "
+              f"{judge_counter['rate_limited']} rate limited | {judge_counter['failed']} failed | "
+              f"Success rate: {success_rate:.1f}%")
     
     return index, prediction
 
@@ -236,10 +275,24 @@ async def main(args):
     print(f"\nPredictions to judge: {to_judge}/{len(predictions)}")
     
     if to_judge == 0:
-        print("All predictions already judged!")
+        print("✓ All predictions already judged!")
     else:
-        print(f"\nStarting judging with {args.num_workers} workers...")
-        print(f"Judge model: {args.judge}\n")
+        print(f"\n{'='*60}")
+        print(f"Starting judging process")
+        print(f"{'='*60}")
+        print(f"  Workers: {args.num_workers}")
+        print(f"  Judge model: {args.judge}")
+        print(f"  Predictions to judge: {to_judge}")
+        print(f"  Estimated time: ~{(to_judge / args.num_workers * 2):.1f}-{(to_judge / args.num_workers * 3):.1f} minutes")
+        print(f"{'='*60}\n")
+        
+        # Reset counters
+        judge_counter["total"] = 0
+        judge_counter["successful"] = 0
+        judge_counter["failed"] = 0
+        judge_counter["rate_limited"] = 0
+        
+        start_time = time.time()
         
         # Judge all predictions
         results = await judge_all_predictions(
@@ -250,16 +303,32 @@ async def main(args):
             args.num_workers
         )
         
+        elapsed_time = time.time() - start_time
+        
         # Update predictions with results
+        updated_count = 0
         for index, prediction in results:
             if index is not None and prediction is not None:
                 predictions[index] = prediction
+                updated_count += 1
+        
+        print(f"\n{'='*60}")
+        print(f"Judging complete!")
+        print(f"{'='*60}")
+        print(f"  Time taken: {elapsed_time / 60:.1f} minutes")
+        print(f"  Judgments processed: {judge_counter['total']}")
+        print(f"  Successful: {judge_counter['successful']}")
+        print(f"  Rate limited: {judge_counter['rate_limited']}")
+        print(f"  Failed: {judge_counter['failed']}")
+        print(f"  Updated predictions: {updated_count}")
+        print(f"{'='*60}\n")
         
         # Save results
+        print(f"Saving results to: {args.output}")
         with open(args.output, 'w') as f:
             json.dump(predictions, f, indent=2)
         
-        print(f"\nSaved judged predictions to: {args.output}")
+        print(f"✓ Saved successfully!")
     
     # Calculate and display accuracy
     accuracy, correct, total = calculate_accuracy(predictions)
