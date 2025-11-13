@@ -1,6 +1,5 @@
 """
-Evaluate model predictions using simple pattern matching (no LLM-as-judge needed).
-Much faster and free compared to OpenAI API approach.
+Evaluate the model and separate by correctness using simple pattern matching.
 """
 import os
 import json
@@ -182,16 +181,7 @@ def judge_prediction(prediction, dataset_name, domain):
     
     is_correct = result["is_correct"]
     
-    # Assign confidence token
-    if is_correct:
-        confidence_token = f"<CN_{domain}>"
-    else:
-        confidence_token = f"<UN_{domain}>"
-    
-    # Create tagged response
-    tagged_response = f"{response} {confidence_token}"
-    
-    # Update prediction
+    # Update prediction with evaluation info (NO LABELING)
     prediction["judge_response"] = {
         "extracted_answer": result["extracted_answer"],
         "ground_truth": result["ground_truth"],
@@ -199,8 +189,6 @@ def judge_prediction(prediction, dataset_name, domain):
         "correct": "yes" if is_correct else "no"
     }
     prediction["correct"] = is_correct
-    prediction["tagged_response"] = tagged_response
-    prediction["confidence_token"] = confidence_token
     
     return prediction
 
@@ -223,7 +211,7 @@ def calculate_accuracy(predictions):
 
 
 def main(args):
-    """Main function to judge predictions."""
+    """Main function to judge predictions and separate by correctness."""
     
     # Validate dataset
     if args.dataset not in DATASET_CONFIGS:
@@ -233,10 +221,10 @@ def main(args):
     domain = config['domain']
     
     print(f"\n{'='*60}")
-    print(f"Judging predictions for {args.dataset} dataset")
+    print(f"Evaluating predictions for {args.dataset} dataset")
     print(f"Method: Pattern-based extraction (no LLM)")
     print(f"Domain: {domain}")
-    print(f"Confidence tokens: <CN_{domain}> (correct) / <UN_{domain}> (incorrect)")
+    print(f"Output: Separate correct and incorrect predictions")
     print(f"{'='*60}\n")
     
     # Load predictions
@@ -246,91 +234,87 @@ def main(args):
     
     print(f"Loaded {len(predictions)} predictions")
     
-    # Set output file
-    if args.output is None:
+    # Set output files
+    if args.output_prefix is None:
         base_name = os.path.splitext(args.predictions)[0]
-        args.output = f"{base_name}_tagged.json"
+        args.output_prefix = base_name
+    
+    correct_output = f"{args.output_prefix}_correct.json"
+    incorrect_output = f"{args.output_prefix}_incorrect.json"
     
     # Create output directory if needed
-    output_dir = os.path.dirname(args.output)
+    output_dir = os.path.dirname(args.output_prefix)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     
-    # Load existing judged predictions if resuming
-    if os.path.exists(args.output):
-        with open(args.output, 'r') as f:
-            judged_predictions = json.load(f)
-        print(f"Resuming from existing file with {len(judged_predictions)} judged predictions")
-        # Merge with loaded predictions
-        for idx, judged_pred in judged_predictions.items():
-            if idx in predictions:
-                predictions[idx] = judged_pred
+    print(f"\n{'='*60}")
+    print(f"Starting evaluation (pattern matching)")
+    print(f"{'='*60}\n")
     
-    # Count how many need judging
-    to_judge = sum(1 for p in predictions.values() if "judge_response" not in p)
-    print(f"\nPredictions to judge: {to_judge}/{len(predictions)}")
+    # Judge all predictions with progress bar
+    correct_predictions = {}
+    incorrect_predictions = {}
     
-    if to_judge == 0:
-        print("✓ All predictions already judged!")
-    else:
-        print(f"\n{'='*60}")
-        print(f"Starting judging process (pattern matching)")
-        print(f"{'='*60}\n")
+    for idx, prediction in tqdm(predictions.items(), desc="Evaluating"):
+        judged_pred = judge_prediction(prediction, args.dataset, domain)
         
-        # Judge all predictions with progress bar
-        judged_count = 0
-        for idx, prediction in tqdm(predictions.items(), desc="Judging"):
-            if "judge_response" not in prediction:
-                predictions[idx] = judge_prediction(prediction, args.dataset, domain)
-                judged_count += 1
-                
-                # Save periodically (every 1000)
-                if judged_count % 1000 == 0:
-                    with open(args.output, 'w') as f:
-                        json.dump(predictions, f, indent=2)
-        
-        print(f"\n{'='*60}")
-        print(f"Judging complete!")
-        print(f"{'='*60}")
-        print(f"  Judgments processed: {judged_count}")
-        print(f"{'='*60}\n")
-        
-        # Save final results
-        print(f"Saving results to: {args.output}")
-        with open(args.output, 'w') as f:
-            json.dump(predictions, f, indent=2)
-        
-        print(f"✓ Saved successfully!")
+        if judged_pred["correct"]:
+            correct_predictions[idx] = judged_pred
+        else:
+            incorrect_predictions[idx] = judged_pred
     
-    # Calculate and display accuracy
-    accuracy, correct, total = calculate_accuracy(predictions)
+    # Calculate statistics
+    total = len(predictions)
+    correct_count = len(correct_predictions)
+    incorrect_count = len(incorrect_predictions)
+    accuracy = (correct_count / total * 100) if total > 0 else 0
     
     print(f"\n{'='*60}")
-    print(f"RESULTS")
+    print(f"EVALUATION COMPLETE")
     print(f"{'='*60}")
     print(f"Dataset: {args.dataset} ({domain})")
     print(f"Total predictions: {total}")
-    print(f"Correct: {correct}")
-    print(f"Incorrect: {total - correct}")
-    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Correct: {correct_count} ({accuracy:.2f}%)")
+    print(f"Incorrect: {incorrect_count} ({100-accuracy:.2f}%)")
     print(f"{'='*60}\n")
     
-    # Show sample tagged responses
-    print("Sample tagged responses:")
-    sample_count = 0
-    for idx, pred in predictions.items():
-        if "tagged_response" in pred and sample_count < 3:
-            print(f"\n[Example {sample_count + 1}]")
-            print(f"Correct: {pred['correct']}")
-            print(f"Token: {pred['confidence_token']}")
-            print(f"Extracted: {pred['judge_response']['extracted_answer']}")
-            print(f"Tagged: {pred['tagged_response'][:200]}...")
-            sample_count += 1
+    # Save separated predictions
+    print(f"Saving results...")
+    print(f"  Correct predictions → {correct_output}")
+    with open(correct_output, 'w') as f:
+        json.dump(correct_predictions, f, indent=2)
+    
+    print(f"  Incorrect predictions → {incorrect_output}")
+    with open(incorrect_output, 'w') as f:
+        json.dump(incorrect_predictions, f, indent=2)
+    
+    print(f"\n✓ Successfully saved {correct_count} correct and {incorrect_count} incorrect predictions!")
+    
+    # Show sample predictions
+    print(f"\n{'='*60}")
+    print("SAMPLE CORRECT PREDICTIONS:")
+    print(f"{'='*60}")
+    for i, (idx, pred) in enumerate(list(correct_predictions.items())[:2]):
+        print(f"\n[Correct Example {i+1}]")
+        print(f"  Response: {pred['response'][:150]}...")
+        print(f"  Extracted: {pred['judge_response']['extracted_answer']}")
+        print(f"  Ground Truth: {pred['judge_response']['ground_truth']}")
+    
+    print(f"\n{'='*60}")
+    print("SAMPLE INCORRECT PREDICTIONS:")
+    print(f"{'='*60}")
+    for i, (idx, pred) in enumerate(list(incorrect_predictions.items())[:2]):
+        print(f"\n[Incorrect Example {i+1}]")
+        print(f"  Response: {pred['response'][:150]}...")
+        print(f"  Extracted: {pred['judge_response']['extracted_answer']}")
+        print(f"  Ground Truth: {pred['judge_response']['ground_truth']}")
+    
+    print(f"\n{'='*60}\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Judge model predictions using pattern matching (no LLM needed)"
+        description="Evaluate predictions and separate by correctness (no LLM needed)"
     )
     parser.add_argument(
         "--predictions",
@@ -346,10 +330,10 @@ if __name__ == "__main__":
         help="Dataset name"
     )
     parser.add_argument(
-        "--output",
+        "--output-prefix",
         type=str,
         default=None,
-        help="Output file for tagged predictions (default: {predictions}_tagged.json)"
+        help="Output file prefix (creates {prefix}_correct.json and {prefix}_incorrect.json)"
     )
     
     args = parser.parse_args()
