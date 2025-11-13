@@ -10,16 +10,48 @@ import argparse
 import os
 
 
+def clean_record(record: dict) -> dict:
+    """
+    Clean a record:
+    - Normalize correct_answer to always be a string
+    - Remove judge_response
+    - Extract extracted_answer to top level if it exists in judge_response
+    """
+    cleaned = record.copy()
+    
+    # Normalize correct_answer to string
+    if 'correct_answer' in cleaned:
+        ca = cleaned['correct_answer']
+        if isinstance(ca, bool):
+            # Convert boolean to lowercase string
+            cleaned['correct_answer'] = str(ca).lower()
+        elif ca is None:
+            cleaned['correct_answer'] = ""
+        else:
+            # Already a string or other type, convert to string
+            cleaned['correct_answer'] = str(ca)
+    
+    # Extract extracted_answer from judge_response if it exists
+    if 'judge_response' in cleaned and isinstance(cleaned['judge_response'], dict):
+        judge_resp = cleaned['judge_response']
+        if 'extracted_answer' in judge_resp:
+            cleaned['extracted_answer'] = judge_resp['extracted_answer']
+        # Remove judge_response
+        del cleaned['judge_response']
+    
+    return cleaned
+
+
 def convert_json_to_jsonl(input_file: str, output_file: str = None):
     """
-    Convert JSON dict format to JSONL format.
+    Convert JSON dict format to JSONL format and clean records.
     
     Args:
         input_file: Path to input JSON file (dict format)
         output_file: Path to output JSONL file (default: adds .jsonl extension)
     """
     print("="*70)
-    print("Converting JSON to JSONL Format")
+    print("Converting JSON to JSONL Format and Cleaning")
     print("="*70)
     print(f"Input: {input_file}")
     print(f"Output: {output_file or 'auto'}")
@@ -45,20 +77,45 @@ def convert_json_to_jsonl(input_file: str, output_file: str = None):
     
     print(f"   ✓ Loaded {len(records):,} records")
     
+    # Clean records
+    print("\n2. Cleaning records...")
+    print("   - Normalizing correct_answer to string (True/False → 'true'/'false')")
+    print("   - Removing judge_response")
+    print("   - Extracting extracted_answer to top level")
+    
+    cleaned_records = []
+    bool_count = 0
+    string_count = 0
+    
+    for record in records:
+        cleaned = clean_record(record)
+        cleaned_records.append(cleaned)
+        
+        # Count original types for stats
+        if 'correct_answer' in record:
+            if isinstance(record['correct_answer'], bool):
+                bool_count += 1
+            else:
+                string_count += 1
+    
+    print(f"   ✓ Cleaned {len(cleaned_records):,} records")
+    print(f"     Converted {bool_count:,} boolean correct_answer values to strings")
+    print(f"     Kept {string_count:,} string correct_answer values")
+    
     # Determine output file
     if output_file is None:
         base_name = os.path.splitext(input_file)[0]
         output_file = f"{base_name}.jsonl"
     
     # Write JSONL format
-    print(f"\n2. Writing JSONL format to: {output_file}")
+    print(f"\n3. Writing JSONL format to: {output_file}")
     os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else '.', exist_ok=True)
     
     with open(output_file, 'w', encoding='utf-8') as f:
-        for record in records:
+        for record in cleaned_records:
             f.write(json.dumps(record, ensure_ascii=False) + '\n')
     
-    print(f"   ✓ Wrote {len(records):,} records to JSONL file")
+    print(f"   ✓ Wrote {len(cleaned_records):,} records to JSONL file")
     
     # Show sample
     print("\n3. Sample record (first line):")

@@ -20,68 +20,10 @@ import random
 # ===============================
 
 MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
-TRAIN_PATH = "merged_data/full_train_data.jsonl"
+TRAIN_PATH = "merged_data/full_train_data_sft.jsonl"
 OUTPUT_DIR = "./conf_sft_qwen3b"
 
 SPECIAL_TOKENS = ["<C_READ>", "<U_READ>", "<C_MED>", "<U_MED>"]
-
-# ===============================
-# Load dataset
-# ===============================
-
-import json
-from datasets import Dataset
-
-print("Loading dataset...")
-
-# Load the JSON dictionary
-with open(TRAIN_PATH, 'r') as f:
-    data_dict = json.load(f)
-
-print(f"Loaded {len(data_dict)} raw samples.")
-
-# Convert to list, keeping ONLY the fields we need
-data_list = []
-for key, value in data_dict.items():
-    # Extract only the fields needed for training
-    clean_sample = {
-        'question': value['question'],
-        'tagged_response': value['tagged_response'],
-        'correct': value['correct'],  
-        'dataset': value['domain']
-    }
-    
-    data_list.append(clean_sample)
-
-# Create HuggingFace Dataset
-ds = Dataset.from_list(data_list)
-
-print(f"Created dataset with {len(ds)} samples.")
-print(f"Columns: {ds.column_names}")
-
-# Show domain distribution
-domains = {}
-for item in data_list:
-    domain = item['dataset']
-    domains[domain] = domains.get(domain, 0) + 1
-
-print(f"\nDomain distribution:")
-for domain, count in domains.items():
-    print(f"  - {domain}: {count}")
-
-# Verify required fields
-required_fields = ['question', 'tagged_response', 'correct', 'dataset']
-missing = [f for f in required_fields if f not in ds.column_names]
-
-if missing:
-    raise ValueError(f"Dataset missing required fields: {missing}")
-
-print("\n✅ Dataset loaded successfully!")
-print(f"\nFirst sample:")
-print(f"  Domain: {ds[0]['dataset']}")
-print(f"  Question: {ds[0]['question'][:100]}...")
-print(f"  Tagged response ends with: ...{ds[0]['tagged_response'][-50:]}")
-print(f"  Correct: {ds[0]['correct']}")
 
 
 # ===============================
