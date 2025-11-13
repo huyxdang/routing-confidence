@@ -13,6 +13,8 @@ from peft import LoraConfig, get_peft_model
 import random
 
 
+
+
 # ===============================
 # Config
 # ===============================
@@ -22,6 +24,29 @@ TRAIN_PATH = "merged_data/full_train_data.json"
 OUTPUT_DIR = "./conf_sft_qwen3b"
 
 SPECIAL_TOKENS = ["<C_READ>", "<U_READ>", "<C_MED>", "<U_MED>"]
+
+# ===============================
+# Load dataset
+# ===============================
+
+import json
+from datasets import Dataset
+
+print("Loading dataset...")
+
+# Load the JSON dictionary
+with open(TRAIN_PATH, 'r') as f:
+    data_dict = json.load(f)
+
+# Convert to list
+data_list = []
+for key, value in data_dict.items():
+    data_list.append(value)
+
+# Create HuggingFace Dataset
+ds = Dataset.from_list(data_list)
+
+print(f"Loaded {len(ds)} samples.")
 
 
 # ===============================
