@@ -14,8 +14,6 @@ from peft import LoraConfig, get_peft_model
 import random
 
 
-
-
 # ===============================
 # Config
 # ===============================
@@ -87,7 +85,7 @@ class QuickEvalCallback(TrainerCallback):
 
         for idx in ids:
             e = self.eval_data[idx]
-            domain = e.get("dataset", "").lower()
+            domain = e.get("domain", "").lower()  # Changed from "dataset" to "domain"
 
             prompt = f"Question: {e['question']}\n\nAnswer:"
             inp = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
@@ -162,16 +160,49 @@ print(f"Loaded {len(ds)} samples.")
 # ===============================
 
 def format_example(e):
+    """Convert raw sample to tokenized input."""
     text = (
         f"Question: {e['question']}\n\n"
         f"Answer: {e['tagged_response']}"
     )
-    toks = tokenizer(text, truncation=True, max_length=2048, padding=False)
-    toks["labels"] = toks["input_ids"].copy()
-    return toks
+    
+    # Tokenize
+    result = tokenizer(
+        text, 
+        truncation=True, 
+        max_length=2048,
+    )
+    
+    # Add labels
+    result["labels"] = result["input_ids"].copy()
+    
+    # Keep original fields for validation (using "domain" not "dataset")
+    result["question"] = e["question"]
+    result["domain"] = e["domain"]  # Changed from "dataset" to "domain"
+    result["correct"] = e["correct"]
+    result["tagged_response"] = e["tagged_response"]
+    
+    return result
 
-ds = ds.map(format_example)
+# Get original columns
+original_columns = ds.column_names
+print(f"Original columns: {original_columns}")
+
+# Apply preprocessing
+ds = ds.map(
+    format_example,
+    remove_columns=original_columns,
+    desc="Tokenizing dataset"
+)
+
+print(f"After preprocessing:")
+print(f"  Columns: {ds.column_names}")
+print(f"  Sample length: {len(ds[0]['input_ids'])} tokens")
+
+# Shuffle
 ds = ds.shuffle(seed=42)
+
+print("✅ Dataset ready for training!\n")
 
 
 # ===============================
@@ -203,7 +234,7 @@ def full_validate(model, tokenizer, data, max_samples=300):
     
     for i in range(min(len(data), max_samples)):
         e = data[i]
-        domain = e.get("dataset", "").lower()
+        domain = e.get("domain", "").lower()  # Changed from "dataset" to "domain"
         prompt = f"Question: {e['question']}\n\nAnswer:"
         
         # Generate
@@ -294,6 +325,7 @@ args = TrainingArguments(
 data_collator = DataCollatorForLanguageModeling(
     tokenizer=tokenizer,
     mlm=False,  # Causal LM, not masked LM
+    pad_to_multiple_of=8,  # Optional: pad to multiple of 8 for efficiency
 )
 
 trainer = Trainer(
@@ -304,9 +336,11 @@ trainer = Trainer(
     callbacks=[QuickEvalCallback(model, tokenizer, ds, every=400)]
 )
 
+print("Starting training...")
 trainer.train()
 
 # Final validation
+print("\nRunning final validation...")
 full_validate(model, tokenizer, ds, max_samples=500)
 
 
@@ -314,6 +348,7 @@ full_validate(model, tokenizer, ds, max_samples=500)
 # Save model
 # ===============================
 
+print("\nSaving model...")
 model.save_pretrained(OUTPUT_DIR)
 tokenizer.save_pretrained(OUTPUT_DIR)
-print("Training complete!")
+print(f"✅ Training complete! Model saved to {OUTPUT_DIR}")
