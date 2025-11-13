@@ -301,7 +301,7 @@ class ConfidenceDataset(Dataset):
     def __getitem__(self, idx):
         example = self.examples[idx]
         
-        # Tokenize full sequence
+        # Tokenize full sequence (input + output with confidence token)
         full_text = example['input'] + example['output']
         tokenized = self.tokenizer(
             full_text,
@@ -311,20 +311,9 @@ class ConfidenceDataset(Dataset):
             return_tensors=None
         )
         
-        # Find where the output starts
-        input_ids = tokenized['input_ids']
-        input_only = self.tokenizer(
-            example['input'],
-            add_special_tokens=False,
-            return_tensors=None
-        )
-        input_length = len(input_only['input_ids'])
-        
         return {
-            "input_ids": input_ids,
+            "input_ids": tokenized['input_ids'],
             "attention_mask": tokenized['attention_mask'],
-            "input_length": input_length,
-            "dataset": example['dataset']
         }
 
 
@@ -343,7 +332,6 @@ class ConfidenceTokenCollator:
         # Extract components
         input_ids = [f['input_ids'] for f in features]
         attention_masks = [f['attention_mask'] for f in features]
-        input_lengths = [f['input_length'] for f in features]
         
         # Pad sequences
         max_length = max(len(ids) for ids in input_ids)
