@@ -47,8 +47,8 @@ for key, value in data_dict.items():
     clean_sample = {
         'question': value['question'],
         'tagged_response': value['tagged_response'],
-        'correct': bool(value['correct']),  # Ensure it's a boolean
-        'dataset': value['dataset']
+        'correct': value['correct'],  
+        'dataset': value['domain']
     }
     
     data_list.append(clean_sample)
