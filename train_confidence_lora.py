@@ -795,11 +795,15 @@ def main():
         output_dir
     )
     
-    # Trainer
+    # Trainer (use small eval dataset to trigger callbacks)
+    # We'll use first 10 examples as dummy eval dataset just to trigger evaluation
+    dummy_eval_dataset = torch.utils.data.Subset(train_dataset, range(min(10, len(train_dataset))))
+    
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
+        eval_dataset=dummy_eval_dataset,  # Dummy dataset to trigger evaluation
         data_collator=data_collator,
         callbacks=[val_callback],
     )
@@ -810,6 +814,16 @@ def main():
     print(f"{'='*70}\n")
     
     trainer.train()
+    
+    # Run final validation manually if not already done
+    print(f"\n{'='*70}")
+    print("Running final validation...")
+    print(f"{'='*70}")
+    val_callback.on_evaluate(
+        training_args,
+        trainer.state,
+        trainer.control
+    )
     
     # Save final model
     final_path = os.path.join(output_dir, "final")
