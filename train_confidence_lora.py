@@ -775,6 +775,7 @@ def main():
         max_grad_norm=args.max_grad_norm,
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
+        evaluation_strategy="steps",  # Enable evaluation during training
         eval_steps=args.eval_steps,
         save_total_limit=3,
         bf16=args.bf16,
