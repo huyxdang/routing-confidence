@@ -23,9 +23,6 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-# CRITICAL: Import unsloth BEFORE transformers and peft for optimizations
-from unsloth import FastLanguageModel
-
 from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
@@ -35,6 +32,7 @@ from transformers import (
     TrainerCallback,
     TrainerState,
     TrainerControl,
+    BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from tqdm import tqdm
@@ -180,12 +178,25 @@ def initialize_model_with_tokens(
     print(f"\nLoading base model: {model_name}")
     print(f"Using 8-bit quantization for H200 (141GB available)")
     
-    # Load model with Unsloth
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_length,
+    # Configure 8-bit quantization
+    bnb_config = BitsAndBytesConfig(
         load_in_8bit=True,
-        dtype=None,  # Auto-detect
+        llm_int8_threshold=6.0,
+        llm_int8_has_fp16_weight=False,
+    )
+    
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Load model with 8-bit quantization
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=bnb_config,
+        device_map="auto",
+        torch_dtype=torch.float16,
+        trust_remote_code=True,
     )
     
     print(f"Original vocabulary size: {len(tokenizer)}")
@@ -656,24 +667,32 @@ class ValidationCallback(TrainerCallback):
 
 
 def setup_lora(model: AutoModelForCausalLM, args) -> AutoModelForCausalLM:
-    """Setup LoRA configuration."""
+    """Setup LoRA configuration using standard PEFT."""
     
     print("\nConfiguring LoRA...")
     print(f"  rank (r): {args.lora_r}")
     print(f"  alpha: {args.lora_alpha}")
     print(f"  dropout: {args.lora_dropout}")
     
-    model = FastLanguageModel.get_peft_model(
-        model,
+    # Prepare model for k-bit training
+    model = prepare_model_for_kbit_training(model)
+    
+    # Configure LoRA
+    lora_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                        "gate_proj", "up_proj", "down_proj"],
         bias="none",
-        use_gradient_checkpointing=True,
-        random_state=args.seed,
+        task_type="CAUSAL_LM",
     )
+    
+    # Apply LoRA
+    model = get_peft_model(model, lora_config)
+    
+    # Enable gradient checkpointing
+    model.enable_input_require_grads()
     
     # Print trainable parameters
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -1,25 +1,20 @@
 #!/bin/bash
 #
-# Fix Unsloth Installation Issues
+# Fix Unsloth Installation Issues (SIMPLE VERSION)
 # Run this if you get unsloth_zoo errors
 
 echo "=========================================="
-echo "Fixing Unsloth Installation"
+echo "Fixing Unsloth Installation (Simple Fix)"
 echo "=========================================="
 
-# Install unsloth_zoo first
+# Just install the missing package - that's all!
 echo ""
-echo "Step 1: Installing unsloth-zoo..."
+echo "Installing unsloth-zoo (the only missing package)..."
 pip install unsloth-zoo
-
-# Reinstall unsloth to ensure compatibility
-echo ""
-echo "Step 2: Reinstalling unsloth..."
-pip install --upgrade --force-reinstall --no-cache-dir "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 
 # Verify installation
 echo ""
-echo "Step 3: Verifying installation..."
+echo "Verifying installation..."
 python -c "from unsloth import FastLanguageModel; print('✓ Unsloth imported successfully')"
 
 echo ""

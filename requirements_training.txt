@@ -11,9 +11,8 @@ accelerate>=0.25.0
 peft>=0.7.0
 bitsandbytes>=0.41.0
 
-# Unsloth for fast LoRA training
-unsloth @ git+https://github.com/unslothai/unsloth.git
-unsloth-zoo  # Required by unsloth
+# Note: Unsloth removed due to segfault issues
+# Standard PEFT is more stable and widely supported
 
 # Training utilities
 tensorboard>=2.15.0
