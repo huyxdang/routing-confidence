@@ -38,15 +38,50 @@ print("Loading dataset...")
 with open(TRAIN_PATH, 'r') as f:
     data_dict = json.load(f)
 
-# Convert to list
+print(f"Loaded {len(data_dict)} raw samples.")
+
+# Convert to list, keeping ONLY the fields we need
 data_list = []
 for key, value in data_dict.items():
-    data_list.append(value)
+    # Extract only the fields needed for training
+    clean_sample = {
+        'question': value['question'],
+        'tagged_response': value['tagged_response'],
+        'correct': bool(value['correct']),  # Ensure it's a boolean
+        'dataset': value['dataset']
+    }
+    
+    data_list.append(clean_sample)
 
 # Create HuggingFace Dataset
 ds = Dataset.from_list(data_list)
 
-print(f"Loaded {len(ds)} samples.")
+print(f"Created dataset with {len(ds)} samples.")
+print(f"Columns: {ds.column_names}")
+
+# Show domain distribution
+domains = {}
+for item in data_list:
+    domain = item['dataset']
+    domains[domain] = domains.get(domain, 0) + 1
+
+print(f"\nDomain distribution:")
+for domain, count in domains.items():
+    print(f"  - {domain}: {count}")
+
+# Verify required fields
+required_fields = ['question', 'tagged_response', 'correct', 'dataset']
+missing = [f for f in required_fields if f not in ds.column_names]
+
+if missing:
+    raise ValueError(f"Dataset missing required fields: {missing}")
+
+print("\n✅ Dataset loaded successfully!")
+print(f"\nFirst sample:")
+print(f"  Domain: {ds[0]['dataset']}")
+print(f"  Question: {ds[0]['question'][:100]}...")
+print(f"  Tagged response ends with: ...{ds[0]['tagged_response'][-50:]}")
+print(f"  Correct: {ds[0]['correct']}")
 
 
 # ===============================
