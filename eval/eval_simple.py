@@ -6,6 +6,7 @@ import json
 import argparse
 import re
 from tqdm import tqdm
+from datasets import load_dataset
 
 
 
@@ -123,44 +124,46 @@ def extract_boolq_answer(response, ground_truth):
 
 
 def extract_medqa_answer(response, ground_truth):
-    """Extract and compare MedQA answer (A/B/C/D)."""
-    response_upper = response.upper().strip()
+    """Extract and compare MedQA answer (A/B/C/D/E)."""
+    response_stripped = response.strip()
     
-    # Look for A, B, C, or D at the beginning (first 20 chars)
-    beginning = response_upper[:20]
+    # Look for pattern "LETTER: TEXT" at the beginning
+    letter_colon_pattern = r'^([ABCDE]):\s*'
+    match = re.match(letter_colon_pattern, response_stripped, re.IGNORECASE)
     
-    # Pattern to find option letter
-    option_pattern = r'\b([ABCD])\b'
-    matches = re.findall(option_pattern, beginning)
-    
-    if matches:
-        extracted = matches[0]
+    if match:
+        # Found "C: ..." format
+        extracted_letter = match.group(1).upper()
     else:
-        # Try to find it in first sentence
-        first_sentence = response_upper.split('.')[0] if '.' in response_upper else response_upper[:100]
-        matches = re.findall(option_pattern, first_sentence)
+        # Try to find just the letter at the beginning
+        response_upper = response_stripped.upper()
+        beginning = response_upper[:20]
+        
+        option_pattern = r'\b([ABCDE])\b'
+        matches = re.findall(option_pattern, beginning)
+        
         if matches:
-            extracted = matches[0]
+            extracted_letter = matches[0]
         else:
-            extracted = 'unknown'
+            # Try to find it in first sentence
+            first_sentence = response_upper.split('.')[0] if '.' in response_upper else response_upper[:100]
+            matches = re.findall(option_pattern, first_sentence)
+            if matches:
+                extracted_letter = matches[0]
+            else:
+                extracted_letter = 'unknown'
     
-    # Ground truth is the answer string
-    expected = ground_truth.strip().upper()
+    # Ground truth should be a single letter (A-E)
+    expected_letter = ground_truth.strip().upper()
     
-    # Sometimes ground truth might be full text, extract letter if needed
-    if len(expected) > 1:
-        # Try to extract letter from ground truth
-        gt_matches = re.findall(option_pattern, expected[:20])
-        if gt_matches:
-            expected = gt_matches[0]
-    
-    is_correct = extracted == expected
+    # Simple letter comparison
+    is_correct = (extracted_letter == expected_letter)
     
     return {
-        "extracted_answer": extracted,
-        "ground_truth": expected,
+        "extracted_answer": extracted_letter,
+        "ground_truth": expected_letter,
         "is_correct": is_correct,
-        "reasoning": f"Extracted: '{extracted}' vs Expected: '{expected}'"
+        "reasoning": f"Extracted: '{extracted_letter}' vs Ground truth: '{expected_letter}'"
     }
 
 
@@ -233,6 +236,25 @@ def main(args):
         predictions = json.load(f)
     
     print(f"Loaded {len(predictions)} predictions")
+    
+    # For MedQA, load the dataset to get answer_idx (letter answers)
+    answer_idx_map = {}
+    if args.dataset == 'medqa':
+        print(f"Loading MedQA dataset to get answer_idx (letter answers)...")
+        try:
+            dataset = load_dataset('huyxdang/medqa-split', split='train')
+            for i, example in enumerate(dataset):
+                if 'answer_idx' in example:
+                    answer_idx_map[str(i)] = example['answer_idx']
+            print(f"✓ Loaded answer_idx for {len(answer_idx_map)} examples")
+            
+            # Replace correct_answer with answer_idx for all predictions
+            for idx in predictions:
+                if idx in answer_idx_map:
+                    predictions[idx]['correct_answer'] = answer_idx_map[idx]
+        except Exception as e:
+            print(f"⚠ Warning: Could not load answer_idx from dataset: {e}")
+            print(f"  Will use existing correct_answer field")
     
     # Set output files
     if args.output_prefix is None:

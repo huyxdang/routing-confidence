@@ -21,7 +21,7 @@ DATASET_CONFIGS = {
     'medqa': {
         'hf_path': 'huyxdang/medqa-split',
         'question_field': 'question',
-        'answer_field': 'answer',
+        'answer_field': 'answer_idx',
         'max_tokens': 512,
         'domain': 'MED',
         'has_options': True,
@@ -264,4 +264,3 @@ if __name__ == "__main__":
         args.tensor_parallel_size,
         args.batch_size
     )
-
