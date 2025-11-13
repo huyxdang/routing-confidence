@@ -510,6 +510,7 @@ class ValidationCallback(TrainerCallback):
             print(f"  Validation Accuracy: {results['val_accuracy']:.2f}%")
             print(f"  Calibration Error: {results['calib_error']:.4f}")
             print(f"  Samples evaluated: {results['num_samples']}")
+            print(f"  Missing tokens: {results['missing_tokens']} ({results['missing_token_rate']:.1f}%)")
         
         # Aggregate metrics
         avg_val_acc = np.mean([r['val_accuracy'] for r in all_results.values()])
@@ -566,6 +567,7 @@ class ValidationCallback(TrainerCallback):
         confidence_scores = []
         correctness = []
         token_matches = []
+        missing_tokens = 0  # Track how many samples had no confidence token
         
         # Limit samples for speed
         num_samples = min(len(val_dataset), max_samples)
@@ -604,8 +606,13 @@ class ValidationCallback(TrainerCallback):
                     predicted_token = token
                     break
             
+            # If no confidence token found, treat as WRONG
             if predicted_token is None:
-                continue  # Skip if no confidence token found
+                # Model failed to output confidence token - count as incorrect
+                token_matches.append(False)
+                missing_tokens += 1
+                # Skip calibration for this sample (no confidence to measure)
+                continue
             
             # Remove confidence token to get answer
             answer_text = generated_text.replace(predicted_token, '').strip()
@@ -661,6 +668,8 @@ class ValidationCallback(TrainerCallback):
             "val_accuracy": val_accuracy,
             "calib_error": calib_error,
             "num_samples": len(token_matches),
+            "missing_tokens": missing_tokens,
+            "missing_token_rate": (missing_tokens / len(token_matches) * 100) if token_matches else 0.0,
             "confidence_scores": confidence_scores,
             "correctness": correctness
         }
