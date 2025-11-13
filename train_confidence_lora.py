@@ -90,6 +90,7 @@ def parse_arguments():
     
     # Training configuration
     parser.add_argument("--num_epochs", type=int, default=3, help="Number of training epochs")
+    parser.add_argument("--max_steps", type=int, default=None, help="Maximum number of training steps (overrides num_epochs if set)")
     parser.add_argument("--batch_size", type=int, default=8, help="Per-device batch size")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=2e-4, help="Learning rate")
@@ -775,6 +776,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=args.num_epochs,
+        max_steps=args.max_steps if args.max_steps else -1,  # -1 means use num_epochs
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
