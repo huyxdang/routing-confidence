@@ -6,8 +6,9 @@ from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
-    Trainer,        
+    Trainer,
     TrainerCallback,
+    DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model
 import random
@@ -165,7 +166,7 @@ def format_example(e):
         f"Question: {e['question']}\n\n"
         f"Answer: {e['tagged_response']}"
     )
-    toks = tokenizer(text, truncation=True, max_length=2048)
+    toks = tokenizer(text, truncation=True, max_length=2048, padding=False)
     toks["labels"] = toks["input_ids"].copy()
     return toks
 
@@ -289,10 +290,17 @@ args = TrainingArguments(
     report_to="none",
 )
 
+# Data collator for padding
+data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=False,  # Causal LM, not masked LM
+)
+
 trainer = Trainer(
     model=model,
     args=args,
     train_dataset=ds,
+    data_collator=data_collator,
     callbacks=[QuickEvalCallback(model, tokenizer, ds, every=400)]
 )
 
