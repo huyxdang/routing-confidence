@@ -490,7 +490,7 @@ class ValidationCallback(TrainerCallback):
             results = self._validate_dataset(
                 val_dataset,
                 dataset_name,
-                max_samples=500  # Limit for speed
+                max_samples=50  # Reduced for quick testing (use 500 for final training)
             )
             
             all_results[dataset_name] = results
