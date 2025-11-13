@@ -70,6 +70,10 @@ class ExtractedAnswer(BaseModel):
 
 async def extract_answer(question, correct_answer, response, judge_model, retry_count=0, max_retries=3):
     """Use LLM to judge if the response is correct."""
+
+    # Add a small delya
+    await asyncio.sleep(0.5)
+
     prompt = JUDGE_PROMPT.format(
         question=question,
         correct_answer=correct_answer,
@@ -101,14 +105,10 @@ async def extract_answer(question, correct_answer, response, judge_model, retry_
             judge_counter["rate_limited"] += 1
             
             if retry_count < max_retries:
-                # Extract wait time from error message if available
-                wait_time = 2.0  # Default wait time
-                if "try again in" in error_str:
-                    try:
-                        wait_part = error_str.split("try again in")[1].split("s")[0].strip()
-                        wait_time = float(wait_part) + 0.5  # Add buffer
-                    except:
-                        pass
+                # Exponential backoff: 2^retry * base + jitter
+                import random
+                base_wait = 2.0
+                wait_time = (2 ** retry_count) * base_wait + random.uniform(0, 1)
                 
                 print(f"  ⚠ Rate limit hit (attempt {retry_count + 1}/{max_retries}). Waiting {wait_time:.1f}s...")
                 await asyncio.sleep(wait_time)

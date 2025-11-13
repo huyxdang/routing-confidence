@@ -45,7 +45,8 @@ def create_prompt(example, dataset_name):
     
     if dataset_name == 'math':
         # Simple problem prompt
-        prompt = f"""Solve the following math problem. Show your work and provide the final answe in LaTeX \\boxed{...} notation.
+        prompt = f"""Solve the following math problem. At the end, on the last line, output ONLY the final answer in LaTeX in the form: 
+        \\boxed{{<final_answer>}}
 
 Problem: {example[config['question_field']]}
 
