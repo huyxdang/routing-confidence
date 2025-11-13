@@ -6,7 +6,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
-    Trainer,
+    Trainer,        
     TrainerCallback,
 )
 from peft import LoraConfig, get_peft_model
@@ -20,7 +20,7 @@ import random
 # ===============================
 
 MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
-TRAIN_PATH = "merged_data/full_train_data.json"
+TRAIN_PATH = "merged_data/full_train_data.jsonl"
 OUTPUT_DIR = "./conf_sft_qwen3b"
 
 SPECIAL_TOKENS = ["<C_READ>", "<U_READ>", "<C_MED>", "<U_MED>"]
