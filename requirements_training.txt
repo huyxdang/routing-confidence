@@ -13,6 +13,7 @@ bitsandbytes>=0.41.0
 
 # Unsloth for fast LoRA training
 unsloth @ git+https://github.com/unslothai/unsloth.git
+unsloth-zoo  # Required by unsloth
 
 # Training utilities
 tensorboard>=2.15.0

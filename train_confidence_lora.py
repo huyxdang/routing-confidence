@@ -22,6 +22,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+
+# CRITICAL: Import unsloth BEFORE transformers and peft for optimizations
+from unsloth import FastLanguageModel
+
 from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
@@ -33,7 +37,6 @@ from transformers import (
     TrainerControl,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from unsloth import FastLanguageModel
 from tqdm import tqdm
 
 
