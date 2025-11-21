@@ -1,8 +1,4 @@
 # Data
-inference/predictions/
-eval/judged/
-correct_incorrect/
-all_tagged/
 
 # Python
 __pycache__/

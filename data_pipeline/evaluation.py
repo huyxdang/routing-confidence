@@ -3,11 +3,17 @@ Evaluation module for separating predictions into correct/incorrect.
 """
 import json
 import os
+import sys
 from tqdm import tqdm
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from eval.eval_simple import (
     extract_medqa_answer,
     extract_boolq_answer,
     extract_math_answer,
+    judge_prediction as eval_judge_prediction,
     DATASET_CONFIGS
 )
 
@@ -39,28 +45,8 @@ def judge_prediction(prediction: dict, dataset_name: str) -> dict:
     config = DATASET_CONFIGS[dataset_name]
     domain = config['domain']
     
-    response = prediction.get('response', '')
-    ground_truth = prediction.get('correct_answer', '')
-    
-    # Extract answer based on dataset
-    if dataset_name == 'medqa':
-        result = extract_medqa_answer(response, ground_truth)
-    elif dataset_name == 'boolq':
-        result = extract_boolq_answer(response, ground_truth)
-    elif dataset_name == 'math':
-        result = extract_math_answer(response, ground_truth)
-    else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}")
-    
-    # Add judge_response and correct fields
-    judged_pred = prediction.copy()
-    judged_pred['judge_response'] = {
-        'extracted_answer': result['extracted_answer'],
-        'ground_truth': result['ground_truth'],
-        'reasoning': result.get('reasoning', ''),
-        'correct': 'yes' if result['is_correct'] else 'no'
-    }
-    judged_pred['correct'] = result['is_correct']
+    # Use the existing judge_prediction function from eval_simple
+    judged_pred = eval_judge_prediction(prediction, dataset_name, domain)
     
     return judged_pred
 
